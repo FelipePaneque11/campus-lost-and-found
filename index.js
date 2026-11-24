@@ -4,7 +4,8 @@ const db = require("./database");
 const session = require("express-session");
 const argon2 = require("argon2");
 const { randomBytes } = require("node:crypto");
-const { readFile } = require("node:fs/promises")
+const { readFile } = require("node:fs/promises");
+const handleError = require("./error-handler");
 
 const app = express();
 const port = 3000;
@@ -185,6 +186,8 @@ app.post("/logout", requireLogin, requireCsrfToken, function signOut(req, res, n
         res.redirect(303, "/");
     })
 })
+
+app.use(handleError);
 
 async function startServer() {
     // Create one fallback hash using the same settings as the demo account.
