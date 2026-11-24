@@ -1,8 +1,13 @@
 const express = require("express");
 const path = require("node:path");
 const db = require("./database");
+const session = require("express-session");
+const argon2 = require("argon2");
+const { randomBytes } = require("node:crypto");
 
 const app = express();
+const port = 3000;
+let dummyPasswordHash;
 
 app.use(function setSecurityHeaders(req, res, next){
     //tells browser to respect the content type express sends.
@@ -14,7 +19,26 @@ app.use(function setSecurityHeaders(req, res, next){
 })
 
 app.use(express.urlencoded({extended: false}));
-const port = 3000;
+
+app.use(session({
+    name: "campus.sid",
+    secret: randomBytes(32).toString("hex"),
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 30 * 60 * 1000 //sets its lifetime for 30min
+    }
+}));
+
+//if session hasn't had user login yet, redirect to login page.
+function requireLogin(req,res,next){
+    if(!req.session.userId){
+        return res.redirect(303, "/login");
+    }
+    next();
+}
 
 //send the homepage response when someone visits the root url
 app.get("/", function showHomePage(req,res){
@@ -44,11 +68,11 @@ app.get("/api/items", function getItems(req,res){
     res.json(items);
 });
 
-app.get("/items/new", function showReportPage(req, res){
+app.get("/items/new", requireLogin, function showReportPage(req, res){
     res.sendFile(path.join(__dirname, "views", "report-item.html"));
 })
 
-app.post("/items", function reportItem(req, res){
+app.post("/items",requireLogin, function reportItem(req, res){
     const fields = req.body || {};
 
     if(typeof fields.name !== "string" || typeof fields.location !== "string"){
@@ -75,7 +99,80 @@ app.post("/items", function reportItem(req, res){
     res.redirect(303, "/");
 });
 
-app.listen(port, "127.0.0.1", function onServerStart(){
-    console.log("Server running at http://127.0.0.1:" + port)
+app.get("/login", function showLoginPage(req,res){
+    res.sendFile(path.join(__dirname, "views", "login.html"));
+});
+
+app.post("/login", async function signIn(req,res,next){
+    const { username, password } = req.body || {};
+    
+    if(typeof username !== "string" || typeof password !== "string"){
+        return res.status(400).send("Enter a username and password.");
+    }
+
+    const user = db.prepare(`
+        SELECT id, password_hash, role
+        FROM users
+        WHERE username = ?
+    `).get(username.trim());
+    
+    // Use the fallback hash if the username does not exist.
+    let hashToCheck = dummyPasswordHash;
+    if(user){
+        hashToCheck = user.password_hash;
+    }
+    //check what the user typed to the hashed password
+    const passwordMatches = await argon2.verify(hashToCheck, password);
+
+    if(!user || !passwordMatches){
+        return res.status(401).send("Incorrect username or password.");
+    }
+
+    //give the signed-in user a fresh session ID
+    req.session.regenerate(function (error){
+        if(error){
+            return next(error);
+        }
+
+        req.session.userId = user.id;
+        req.session.role = user.role;
+        
+        //after successful login, redirect to lost item form page
+        req.session.save(function (error){
+            if(error){
+                return next(error)
+            }
+            res.redirect(303, "/items/new");
+        })
+    });
+})
+
+app.post("/logout", function signOut(req,res,next){
+    //destroy removes the session on the server.
+    req.session.destroy(function (error){
+        if(error){
+            return next(error);
+        }
+
+        res.clearCookie("campus.sid");
+        res.redirect(303, "/");
+    })
+})
+
+async function startServer() {
+    // Create one fallback hash using the same settings as the demo account.
+    const randomPassword = randomBytes(32).toString("hex");
+    dummyPasswordHash = await argon2.hash(randomPassword, {
+        type: argon2.argon2id
+    });
+
+    app.listen(port, "127.0.0.1", function onServerStart() {
+        console.log("Server running at http://127.0.0.1:" + port);
+    });
+}
+
+startServer().catch(function (error) {
+    console.error("Could not start the server:", error.message);
+    process.exitCode = 1;
 });
 

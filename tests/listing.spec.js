@@ -3,6 +3,7 @@
 const { test, expect } = require("@playwright/test");
 const { randomUUID } = require("node:crypto");
 const db = require("../database");
+const signIn = require("./sign-in")
 
 test("a saved item name appears as plain text to another visitor", async function ({ page, browser }) {
     const name = "<b>USB charger</b>";
@@ -11,7 +12,7 @@ test("a saved item name appears as plain text to another visitor", async functio
     const location = "Test room " + randomUUID();
 
     try {
-        await page.goto("http://127.0.0.1:3000/items/new");
+        await signIn(page);
         await page.getByLabel("Item name").fill(name);
         await page.getByLabel("Where did you find it?").fill(location);
         await page.getByRole("button", { name: "Report item" }).click();

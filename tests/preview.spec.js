@@ -1,9 +1,10 @@
 //checks if student can enter a sql injection
 
+const signIn = require("./sign-in")
 const { test, expect } = require("@playwright/test");
 
 test("the preview displays an item name as plain text", async function({ page }){
-    await page.goto("http://127.0.0.1:3000/items/new");
+    await signIn(page);
 
     await page.getByLabel("Item name").fill("<b>USB charger</b>");
     await page.getByLabel("Where did you find it?").fill("Library");
