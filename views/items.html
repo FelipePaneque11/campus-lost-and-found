@@ -10,9 +10,14 @@
         <h1>Campus Lost &amp; Found</h1>
         <h2>Found items</h2>
 
-        <ul id="item-list">
-            
-        </ul>
+        <form action="/" method="get">
+            <label for="search">Search by item name or location</label>
+            <input type="search" name="search" id="search">
+            <button type="submit">Search</button>
+            <a href="/">Show all items</a>
+        </form>
+
+        <ul id="item-list"></ul>
     </main>
 
     <script>
@@ -20,7 +25,12 @@
             const list = document.getElementById("item-list");
 
             try {
-                const response = await fetch("/api/items");
+                const params = new URLSearchParams(window.location.search);
+                const search = params.get("search") || "";
+
+                document.getElementById("search").value = search;
+
+                const response = await fetch("/api/items?search=" + encodeURIComponent(search));
 
                 if (!response.ok) {
                     throw new Error("Could not load items");
@@ -29,7 +39,7 @@
                 const items = await response.json();
 
                 if (items.length === 0) {
-                    list.textContent = "No found items have been listed yet.";
+                    list.textContent = "No items found.";
                     return;
                 }
 

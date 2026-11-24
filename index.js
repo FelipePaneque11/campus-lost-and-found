@@ -13,9 +13,22 @@ app.get("/", function showHomePage(req,res){
 });
 
 app.get("/api/items", function getItems(req,res){
-    const query = db.prepare("SELECT name, location FROM items ORDER BY id DESC");
-    const items = query.all()
+    const search = req.query.search || "";
 
+    if(typeof search !== "string"){
+        return res.status(400).json({error: "Search must be text." });
+    }
+
+    const query = db.prepare(`
+        SELECT name, location
+        FROM items
+        WHERE instr(lower(name), lower(?)) > 0
+           OR instr(lower(location), lower(?)) > 0
+        ORDER BY id DESC
+    `);
+
+    //the first value is for name and the second is for location
+    const items = query.all(search.trim(), search.trim());
     //send what we retrieved on query.all and return to the browser
     res.json(items);
 });
