@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Lost &amp; Found</title>
+</head>
+<body> 
+    <main>
+        <h1>Campus Lost &amp; Found</h1>
+        <h2>Found items</h2>
+
+        <ul id="item-list">
+            
+        </ul>
+    </main>
+
+    <script>
+        async function loadItems() {
+            const list = document.getElementById("item-list");
+
+            try {
+                const response = await fetch("/api/items");
+
+                if (!response.ok) {
+                    throw new Error("Could not load items");
+                }
+
+                const items = await response.json();
+
+                if (items.length === 0) {
+                    list.textContent = "No found items have been listed yet.";
+                    return;
+                }
+
+                for (const item of items) {
+                    const row = document.createElement("li");
+
+                    // Display the item details as plain text.
+                    row.textContent = item.name + " — " + item.location;
+                    list.appendChild(row);
+                }
+            } catch (error) {
+                list.textContent = "Could not load the items. Please refresh to try again.";
+            }
+        }
+
+        loadItems();
+    </script>
+</body>
+</html>
