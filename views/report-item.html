@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report a found item | Campus Lost &amp; Found</title>
+</head>
+<body>
+    <main>
+        <a href="/">Back to found items</a>
+        <h1>Report a found item</h1>
+
+        <form action="/items" method="post">
+            <p>
+                <label for="item-name">Item name</label>
+                <input id="item-name" name="name" type="text"
+                    maxlength="100" required placeholder="e.g. Airpods">
+            </p>
+
+            <p>
+                <label for="location">Where did you find it?</label>
+                <input id="location" name="location" type="text"
+                    maxlength="100" required placeholder="e.g. Canteen">
+            </p>
+
+            <button type="submit">Report item</button>
+        </form>
+
+        <h2>Listing preview</h2>
+        <p id="preview">Item name - Location</p>
+    </main>
+
+    <script>
+        const nameInput = document.getElementById("item-name");
+        const locationInput = document.getElementById("location")
+        const preview = document.getElementById("preview")
+
+        function updatePreview(){
+            const name = nameInput.value.trim() || "Item name";
+            const location = locationInput.value.trim() || "Location";
+
+            //display what hte student typed as plain text
+            preview.textContent = name + " - " + location;
+        }
+
+        nameInput.addEventListener("input", updatePreview);
+        locationInput.addEventListener("input", updatePreview);
+    </script>
+</body>
+</html>
