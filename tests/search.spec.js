@@ -16,7 +16,7 @@ test("search finds an item whose name contains an apostrophe", async function ({
         });
 
         expect(response.status()).toBe(200);
-        expect(await response.json()).toEqual([{ name: name, location: location }]);
+        expect(await response.json()).toEqual([{ id: Number(savedItem.lastInsertRowid), name: name, location: location }]);
     } finally {
         db.prepare("DELETE FROM items WHERE id = ?").run(savedItem.lastInsertRowid);
     }

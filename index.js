@@ -53,7 +53,7 @@ function requireCsrfToken(req, res, next) {
     next();
 }
 
-async function sendFormPage(req, res, filename) {
+async function sendFormPage(req, res, filename, itemSummary = "") {
     if (!req.session.csrfToken) {
         req.session.csrfToken = randomBytes(32).toString("hex");
     }
@@ -62,10 +62,17 @@ async function sendFormPage(req, res, filename) {
     const html = await readFile(filePath, "utf8");
 
     // Both forms on the report page need the token for this session.
-    const page = html.replaceAll("{{CSRF_TOKEN}}", req.session.csrfToken);
+    const safeSummary = itemSummary
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
 
-    res.setHeader("Cache-Control", "no-store");
-    res.send(page);
+    const page = html
+        .replaceAll("{{CSRF_TOKEN}}", req.session.csrfToken)
+        .split("{{ITEM_SUMMARY}}").join(safeSummary);
+
+        res.setHeader("Cache-Control", "no-store");
+        res.send(page);
 }
 
 //send the homepage response when someone visits the root url
@@ -82,8 +89,9 @@ app.get("/api/items", function getItems(req,res){
         return res.status(400).json({error: "Search must be text." });
     }
 
+    //we retrieve ID because 2 peple might report the same item name, like airpods or student card, etc...
     const query = db.prepare(`
-        SELECT name, location
+        SELECT id, name, location
         FROM items
         WHERE instr(lower(name), lower(?)) > 0
            OR instr(lower(location), lower(?)) > 0
@@ -186,6 +194,52 @@ app.post("/logout", requireLogin, requireCsrfToken, function signOut(req, res, n
         res.redirect(303, "/");
     })
 })
+
+//route for claim an item
+app.get("/items/:id/claim", requireLogin, function showClaimPage(req, res) {
+    const item = db.prepare(`
+        SELECT name, location
+        FROM items
+        WHERE id = ?
+    `).get(req.params.id);
+
+    if (!item) {
+        return res.status(404).send("Item not found.");
+    }
+
+    return sendFormPage(req, res, "claim-item.html", item.name + " — " + item.location);
+});
+
+app.post("/items/:id/claim", requireLogin, requireCsrfToken, function submitClaim(req, res) {
+    const detail = req.body.detail;
+
+    if (typeof detail !== "string" || detail.trim().length === 0) {
+        return res.status(400).send("Enter a detail that identifies the item.");
+    }
+
+    if (detail.trim().length > 300) {
+        return res.status(400).send("Keep the identifying detail within 300 characters.");
+    }
+
+    const item = db.prepare("SELECT id FROM items WHERE id = ?").get(req.params.id);
+
+    if (!item) {
+        return res.status(404).send("Item not found.");
+    }
+
+    // The claims table allows one claim per student for each item.
+    const result = db.prepare(`
+        INSERT INTO claims (item_id, user_id, identifying_detail)
+        VALUES (?, ?, ?)
+        ON CONFLICT(item_id, user_id) DO NOTHING
+    `).run(item.id, req.session.userId, detail.trim());
+
+    if (result.changes === 0) {
+        return res.status(409).send("You already submitted a claim for this item.");
+    }
+
+    res.status(201).send("Claim submitted. It is pending moderator review.");
+});
 
 app.use(handleError);
 

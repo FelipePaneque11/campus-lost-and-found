@@ -47,8 +47,14 @@
                 for (const item of items) {
                     const row = document.createElement("li");
 
-                    // Display the item details as plain text.
-                    row.textContent = item.name + " — " + item.location;
+                    const details = document.createElement("span");
+                    details.textContent = item.name + " — " + item.location;
+
+                    const claimLink = document.createElement("a");
+                    claimLink.href = "/items/" + item.id + "/claim";
+                    claimLink.textContent = "Claim this item";
+
+                    row.append(details, " ", claimLink);
                     list.appendChild(row);
                 }
             } catch (error) {

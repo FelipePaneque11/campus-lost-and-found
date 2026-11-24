@@ -25,6 +25,7 @@ test("a saved item name appears as plain text to another visitor", async functio
         const row = visitor.locator("#item-list li").filter({ hasText: location });
         await expect(row).toHaveText(name + " — " + location);
         await expect(row.locator("b")).toHaveCount(0);
+        await expect(row.locator("span")).toHaveText(name + " — " + location);
 
         await visitor.close();
     } finally {

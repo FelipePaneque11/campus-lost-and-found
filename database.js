@@ -21,4 +21,16 @@ db.exec(`
     )
 `);
 
+db.exec(`
+    CREATE TABLE IF NOT EXISTS claims(
+        id INTEGER PRIMARY KEY,
+        item_id INTEGER NOT NULL REFERENCES items(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        identifying_detail TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending', 'approved', 'rejected')),
+        UNIQUE (item_id, user_id)
+    )
+`);
+
 module.exports = db;
