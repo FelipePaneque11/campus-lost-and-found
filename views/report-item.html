@@ -11,6 +11,7 @@
         <h1>Report a found item</h1>
 
         <form action="/items" method="post">
+            <input type="hidden" name="csrfToken" value="{{CSRF_TOKEN}}">
             <p>
                 <label for="item-name">Item name</label>
                 <input id="item-name" name="name" type="text"
@@ -27,6 +28,7 @@
         </form>
 
         <form action="/logout" method="post">
+            <input type="hidden" name="csrfToken" value="{{CSRF_TOKEN}}">
             <button type="submit">Sign out</button>
         </form>
 

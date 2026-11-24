@@ -4,6 +4,7 @@ const db = require("./database");
 const session = require("express-session");
 const argon2 = require("argon2");
 const { randomBytes } = require("node:crypto");
+const { readFile } = require("node:fs/promises")
 
 const app = express();
 const port = 3000;
@@ -40,6 +41,32 @@ function requireLogin(req,res,next){
     next();
 }
 
+function requireCsrfToken(req, res, next) {
+    const expected = req.session.csrfToken;
+    const submitted = req.body?.csrfToken;
+
+    if (!expected || submitted !== expected) {
+        return res.status(403).send("Invalid form token. Reload the page and try again.");
+    }
+
+    next();
+}
+
+async function sendFormPage(req, res, filename) {
+    if (!req.session.csrfToken) {
+        req.session.csrfToken = randomBytes(32).toString("hex");
+    }
+
+    const filePath = path.join(__dirname, "views", filename);
+    const html = await readFile(filePath, "utf8");
+
+    // Both forms on the report page need the token for this session.
+    const page = html.replaceAll("{{CSRF_TOKEN}}", req.session.csrfToken);
+
+    res.setHeader("Cache-Control", "no-store");
+    res.send(page);
+}
+
 //send the homepage response when someone visits the root url
 app.get("/", function showHomePage(req,res){
     //build the path to items.html
@@ -69,10 +96,10 @@ app.get("/api/items", function getItems(req,res){
 });
 
 app.get("/items/new", requireLogin, function showReportPage(req, res){
-    res.sendFile(path.join(__dirname, "views", "report-item.html"));
+    return sendFormPage(req,res, "report-item.html");
 })
 
-app.post("/items",requireLogin, function reportItem(req, res){
+app.post("/items", requireLogin, requireCsrfToken, function reportItem(req, res) {
     const fields = req.body || {};
 
     if(typeof fields.name !== "string" || typeof fields.location !== "string"){
@@ -100,10 +127,10 @@ app.post("/items",requireLogin, function reportItem(req, res){
 });
 
 app.get("/login", function showLoginPage(req,res){
-    res.sendFile(path.join(__dirname, "views", "login.html"));
+    return sendFormPage(req, res, "login.html");
 });
 
-app.post("/login", async function signIn(req,res,next){
+app.post("/login", requireCsrfToken, async function signIn(req, res, next) {
     const { username, password } = req.body || {};
     
     if(typeof username !== "string" || typeof password !== "string"){
@@ -147,7 +174,7 @@ app.post("/login", async function signIn(req,res,next){
     });
 })
 
-app.post("/logout", function signOut(req,res,next){
+app.post("/logout", requireLogin, requireCsrfToken, function signOut(req, res, next) {
     //destroy removes the session on the server.
     req.session.destroy(function (error){
         if(error){
