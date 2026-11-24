@@ -4,6 +4,15 @@ const db = require("./database");
 
 const app = express();
 
+app.use(function setSecurityHeaders(req, res, next){
+    //tells browser to respect the content type express sends.
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    //Prevents another page from embedding the app in a frame.
+    //This helps protects buttons such as Report item against clickjacking
+    res.setHeader("Content-Security-Policy", "frame-Ancestors 'none'");
+    next();
+})
+
 app.use(express.urlencoded({extended: false}));
 const port = 3000;
 
