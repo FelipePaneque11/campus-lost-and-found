@@ -48,7 +48,8 @@
                     const row = document.createElement("li");
 
                     const details = document.createElement("span");
-                    details.textContent = item.name + " — " + item.location;
+                    //intentionally vulnerable: render saved user input as HTML
+                    details.innerHTML = item.name + " — " + item.location;
 
                     const claimLink = document.createElement("a");
                     claimLink.href = "/items/" + item.id + "/claim";
