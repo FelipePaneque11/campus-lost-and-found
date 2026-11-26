@@ -42,6 +42,13 @@ function requireLogin(req,res,next){
     next();
 }
 
+function requireModerator(req, res, next){
+    if(req.session.role !== "moderator"){
+        return res.status(403).send("Only moderator can review ownership claims.")
+    }
+    next();
+}
+
 function requireCsrfToken(req, res, next) {
     const expected = req.session.csrfToken;
     const submitted = req.body?.csrfToken;
@@ -178,7 +185,10 @@ app.post("/login", requireCsrfToken, async function signIn(req, res, next) {
             if(error){
                 return next(error)
             }
-            res.redirect(303, "/items/new");
+            if(user.role === "moderator"){
+                return res.redirect(303, "/moderator/claims");
+            }
+            res.redirect(303, "items/new");
         })
     });
 })
@@ -239,6 +249,55 @@ app.post("/items/:id/claim", requireLogin, requireCsrfToken, function submitClai
     }
 
     res.status(201).send("Claim submitted. It is pending moderator review.");
+});
+
+app.get("/api/moderator/claims", requireLogin, requireModerator, function listPendingClaims(req, res){
+    const claims = db.prepare(`
+        SELECT claims.id, items.name AS item_name, claims.identifying_detail
+        FROM claims
+        JOIN items ON items.id = claims.item_id
+        WHERE claims.status = 'pending'
+        ORDER BY claims.id
+    `).all();
+
+    //the response contains private ownership details
+    res.setHeader("Cache-Control", "no-store");
+    res.json(claims);
+})
+
+app.post("/moderator/claims/:id/review", requireLogin, requireModerator, requireCsrfToken, function reviewClaim(req, res){
+    const decision = req.body.decision;
+
+    if(decision !== "approved" && decision !== "rejected"){
+        return res.status(400).send("Choose Approve or Reject.")
+    }
+
+    //The NOT EXISTS works like:
+    //if two students claim the same headphones. 
+    //Once the moderator approves the first claim,
+    //SQLite sees that the headphones already have an approved claim. 
+    //The moderator can still reject the second claim.
+    const result = db.prepare(`
+        UPDATE claims
+        SET status = ?
+        WHERE id = ?
+            AND status = 'pending'
+            AND (? = 'rejected' OR NOT EXISTS (
+                SELECT 1 FROM claims AS other
+                WHERE other.item_id = claims.item_id
+                AND other.status = 'approved'
+            ))
+    `).run(decision, req.params.id, decision);
+
+    if(result.changes === 0){
+        return res.status(409).send("This decision could not be saved. Repoen the queue to check the claim.")
+    }
+
+    res.redirect(303, "/moderator/claims");
+});
+
+app.get("/moderator/claims", requireLogin, requireModerator, function showReviewPage(req, res) {
+    return sendFormPage(req, res, "review-claims.html");
 });
 
 app.use(handleError);

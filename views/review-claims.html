@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review claims | Campus Lost &amp; Found</title>
+</head>
+<body>
+    <main>
+        <a href="/">Back to found items</a>
+        <h1>Review pending claims</h1>
+        <p id="message"></p>
+        <div id="claims"></div>
+
+        <template id="claim-card">
+            <section>
+                <h2></h2>
+                <p></p>
+
+                <form method="post">
+                    <input type="hidden" name="csrfToken" value="{{CSRF_TOKEN}}">
+                    <button name="decision" value="approved">Approve</button>
+                    <button name="decision" value="rejected">Reject</button>
+                </form>
+            </section>
+        </template>
+    </main>
+
+    <script>
+        async function loadClaims() {
+            const message = document.getElementById("message");
+            const container = document.getElementById("claims");
+            const template = document.getElementById("claim-card");
+
+            try {
+                const response = await fetch("/api/moderator/claims");
+                if (!response.ok) {
+                    throw new Error("Could not load claims");
+                }
+
+                const claims = await response.json();
+
+                if (claims.length === 0) {
+                    message.textContent = "No pending claims.";
+                }
+
+                for (const claim of claims) {
+                    const card = template.content.cloneNode(true);
+
+                    card.querySelector("h2").textContent = claim.item_name;
+                    card.querySelector("p").textContent = claim.identifying_detail;
+                    card.querySelector("form").action = "/moderator/claims/" + claim.id + "/review";
+
+                    container.appendChild(card);
+                }
+            } catch (error) {
+                message.textContent = "Could not load the queue. Sign in again and retry.";
+            }
+        }
+
+        loadClaims();
+    </script>
+</body>
+</html>
