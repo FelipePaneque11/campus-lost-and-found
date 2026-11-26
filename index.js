@@ -62,6 +62,13 @@ function requireCsrfToken(req, res, next) {
     next();
 }
 
+function escapeHtmlText(text){
+    return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+}
+
 async function sendFormPage(req, res, filename, itemSummary = "") {
     if (!req.session.csrfToken) {
         req.session.csrfToken = randomBytes(32).toString("hex");
@@ -71,10 +78,7 @@ async function sendFormPage(req, res, filename, itemSummary = "") {
     const html = await readFile(filePath, "utf8");
 
     // Both forms on the report page need the token for this session.
-    const safeSummary = itemSummary
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;");
+    const safeSummary = escapeHtmlText(itemSummary);
 
     const page = html
         .replaceAll("{{CSRF_TOKEN}}", req.session.csrfToken)
@@ -85,10 +89,21 @@ async function sendFormPage(req, res, filename, itemSummary = "") {
 }
 
 //send the homepage response when someone visits the root url
-app.get("/", function showHomePage(req,res){
-    //build the path to items.html
-    const page = path.join(__dirname, "views", "items.html");
-    res.sendFile(page);
+app.get("/", async function showHomePage(req, res) {
+    const search = req.query.search ?? "";
+
+    if (typeof search !== "string") {
+        return res.status(400).send("Search must be text.");
+    }
+
+    let summary = "";
+    if (search.trim()) {
+        summary = "Search results for: " + escapeHtmlText(search.trim());
+    }
+
+    const html = await readFile(path.join(__dirname, "views", "items.html"), "utf8");
+    const page = html.split("{{SEARCH_SUMMARY}}").join(summary);
+    res.send(page);
 });
 
 app.get("/api/items", function getItems(req,res){

@@ -21,3 +21,15 @@ test("search finds an item whose name contains an apostrophe", async function ({
         db.prepare("DELETE FROM items WHERE id = ?").run(savedItem.lastInsertRowid);
     }
 });
+
+test("the home page escapes the search term in its HTML response", async function ({ request }) {
+    const response = await request.get("http://127.0.0.1:3000/", {
+        params: { search: "<b>bottle</b>" }
+    });
+
+    expect(response.status()).toBe(200);
+
+    const html = await response.text();
+    expect(html).toContain("Search results for: &lt;b&gt;bottle&lt;/b&gt;");
+    expect(html).not.toContain("Search results for: <b>bottle</b>");
+});
