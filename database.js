@@ -1,7 +1,10 @@
 const { DatabaseSync } = require("node:sqlite");
 const path = require("node:path");
+const os = require("node:os");
 
-const db = new DatabaseSync(path.join(__dirname, "campus.sqlite"));
+//keep the secure demo database outside the git repository
+const databasePath = path.join(os.homedir(), "campus-lost-and-found-secure.sqlite");
+const db = new DatabaseSync(databasePath);
 
 //keep the existing table and its data when the server restarts
 db.exec(`

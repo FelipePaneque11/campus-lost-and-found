@@ -7,6 +7,7 @@ const { randomBytes } = require("node:crypto");
 const { readFile } = require("node:fs/promises");
 const handleError = require("./error-handler");
 const { logSecurityEvent, recordFailedLogin } = require("./security-log");
+const { encryptDetail, decryptDetail } = require("./claim-crypto");
 
 const app = express();
 const port = 3000;
@@ -274,7 +275,7 @@ app.post("/items/:id/claim", requireLogin, requireCsrfToken, function submitClai
         INSERT INTO claims (item_id, user_id, identifying_detail)
         VALUES (?, ?, ?)
         ON CONFLICT(item_id, user_id) DO NOTHING
-    `).run(item.id, req.session.userId, detail.trim());
+    `).run(item.id, req.session.userId, encryptDetail(detail.trim()));
 
     if (result.changes === 0) {
         return res.status(409).send("You already submitted a claim for this item.");
@@ -291,6 +292,11 @@ app.get("/api/moderator/claims", requireLogin, requireModerator, function listPe
         WHERE claims.status = 'pending'
         ORDER BY claims.id
     `).all();
+
+    //this route has already checked the session and the moderator role
+    for(const claim of claims){
+        claim.identifying_detail = decryptDetail(claim.identifying_detail);
+    }
 
     //the response contains private ownership details
     res.setHeader("Cache-Control", "no-store");
