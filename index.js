@@ -83,10 +83,27 @@ async function sendFormPage(req, res, filename, itemSummary = "") {
 }
 
 //send the homepage response when someone visits the root url
-app.get("/", function showHomePage(req,res){
-    //build the path to items.html
-    const page = path.join(__dirname, "views", "items.html");
-    res.sendFile(page);
+app.get("/", async function showHomePage(req, res) {
+    const search = req.query.search ?? "";
+
+    // Reject unexpected input, such as multiple search parameters.
+    if (typeof search !== "string") {
+        return res.status(400).send("Search must be text.");
+    }
+
+    let summary = "";
+
+    if (search.trim()) {
+        // Intentionally unsafe - the search term is inserted without HTML escaping.
+        summary = "Search results for: " + search.trim();
+    }
+
+    const filePath = path.join(__dirname, "views", "items.html");
+    const html = await readFile(filePath, "utf8");
+
+    const page = html.split("{{SEARCH_SUMMARY}}").join(summary);
+
+    res.send(page);
 });
 
 app.get("/api/items", function getItems(req, res) {
