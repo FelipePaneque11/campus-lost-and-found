@@ -21,3 +21,23 @@ test("search finds an item whose name contains an apostrophe", async function ({
         db.prepare("DELETE FROM items WHERE id = ?").run(savedItem.lastInsertRowid);
     }
 });
+
+test("reflected search input cannot run JavaScript", async function ({ page }) {
+    const search = '<script>document.title = "Reflected XSS demo";</script>';
+
+    // Encode the search term so it travels correctly in the URL.
+    await page.goto(
+        "http://127.0.0.1:3000/?search=" + encodeURIComponent(search)
+    );
+
+    // User input must not change the page title.
+    await expect(page).toHaveTitle("Campus Lost & Found");
+
+    const summary = page.locator("#search-summary");
+
+    // The full input should appear as text.
+    await expect(summary).toHaveText("Search results for: " + search);
+
+    // The browser must not create a script element from that input.
+    await expect(summary.locator("script")).toHaveCount(0);
+});
