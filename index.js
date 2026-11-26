@@ -338,6 +338,11 @@ app.get("/moderator/claims", requireLogin, requireModerator, function showReview
     return sendFormPage(req, res, "review-claims.html");
 });
 
+// Handle unknown routes while preserving our security headers.
+app.use(function notFound(req, res) {
+    res.status(404).type("text").send("Page not found.");
+});
+
 app.use(handleError);
 
 async function startServer() {
