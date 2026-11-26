@@ -20,6 +20,9 @@ app.use(function setSecurityHeaders(req, res, next){
     next();
 })
 
+//css stylesheet available to the browser
+app.use("/css", express.static(path.join(__dirname, "public", "css")));
+
 app.use(express.urlencoded({extended: false}));
 
 app.use(session({
