@@ -33,6 +33,9 @@ app.use(function setSecurityHeaders(req, res, next) {
     next();
 });
 
+// Make the stylesheet available to the browser.
+app.use("/css", express.static(path.join(__dirname, "public", "css")));
+
 app.use("/js", express.static(path.join(__dirname, "public", "js")));
 
 app.use(express.urlencoded({extended: false}));
