@@ -23,9 +23,9 @@ test("a saved item name appears as plain text to another visitor", async functio
         await visitor.goto("http://127.0.0.1:3000/");
 
         const row = visitor.locator("#item-list li").filter({ hasText: location });
-        await expect(row.locator("b")).toHaveCount(0);
         await expect(row.locator("span")).toHaveText(name + " — " + location);
-
+        await expect(row.locator("b")).toHaveCount(0);
+        
         await visitor.close();
     } finally {
         db.prepare("DELETE FROM items WHERE name = ? AND location = ?").run(name, location);
