@@ -4,12 +4,10 @@ const db = require("./database");
 const argon2 = require("argon2");
 const { randomBytes } = require("node:crypto");
 
-async function createDemoStudent(){
-    const username = "demo-student";
-
+async function createDemoStudent(username, role){
     const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
     if(existing){
-        console.log("The demo student already exists");
+        console.log(username + " already exists");
         return;
     }
 
@@ -19,18 +17,23 @@ async function createDemoStudent(){
 
     const insert = db.prepare(`
         INSERT INTO users (username, password_hash, role)
-        VALUES (?, ?, 'student')    
+        VALUES (?, ?, ?)    
     `);
 
-    insert.run(username, passwordHash);
+    insert.run(username, passwordHash, role);
     console.log("Username: ", username);
     console.log("Demo Password: ", password);
 }
 
-createDemoStudent()
-    .catch(function (error) {
-        console.error("could not create the demo student: ", error.message);
+async function seedUsers(){
+    await createDemoStudent("demo-student", "student");
+    await createDemoStudent("demo-moderator", "moderator");
+}
+
+seedUsers()
+    .catch(function (error){
+        console.error("Could not create demo users: ", error.message);
         process.exitCode = 1;
     }).finally(function (){
         db.close();
-    });
+    })

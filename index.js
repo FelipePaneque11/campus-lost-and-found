@@ -4,7 +4,8 @@ const db = require("./database");
 const session = require("express-session");
 const argon2 = require("argon2");
 const { randomBytes } = require("node:crypto");
-const { readFile } = require("node:fs/promises")
+const { readFile } = require("node:fs/promises");
+const handleError = require("./error-handler");
 
 const app = express();
 const port = 3000;
@@ -41,6 +42,13 @@ function requireLogin(req,res,next){
     next();
 }
 
+function requireModerator(req, res, next){
+    if(req.session.role !== "moderator"){
+        return res.status(403).send("Only moderator can review ownership claims.")
+    }
+    next();
+}
+
 function requireCsrfToken(req, res, next) {
     const expected = req.session.csrfToken;
     const submitted = req.body?.csrfToken;
@@ -52,7 +60,7 @@ function requireCsrfToken(req, res, next) {
     next();
 }
 
-async function sendFormPage(req, res, filename) {
+async function sendFormPage(req, res, filename, itemSummary = "") {
     if (!req.session.csrfToken) {
         req.session.csrfToken = randomBytes(32).toString("hex");
     }
@@ -61,10 +69,17 @@ async function sendFormPage(req, res, filename) {
     const html = await readFile(filePath, "utf8");
 
     // Both forms on the report page need the token for this session.
-    const page = html.replaceAll("{{CSRF_TOKEN}}", req.session.csrfToken);
+    const safeSummary = itemSummary
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
 
-    res.setHeader("Cache-Control", "no-store");
-    res.send(page);
+    const page = html
+        .replaceAll("{{CSRF_TOKEN}}", req.session.csrfToken)
+        .split("{{ITEM_SUMMARY}}").join(safeSummary);
+
+        res.setHeader("Cache-Control", "no-store");
+        res.send(page);
 }
 
 //send the homepage response when someone visits the root url
@@ -81,8 +96,9 @@ app.get("/api/items", function getItems(req,res){
         return res.status(400).json({error: "Search must be text." });
     }
 
+    //we retrieve ID because 2 peple might report the same item name, like airpods or student card, etc...
     const query = db.prepare(`
-        SELECT name, location
+        SELECT id, name, location
         FROM items
         WHERE instr(lower(name), lower(?)) > 0
            OR instr(lower(location), lower(?)) > 0
@@ -169,7 +185,10 @@ app.post("/login", requireCsrfToken, async function signIn(req, res, next) {
             if(error){
                 return next(error)
             }
-            res.redirect(303, "/items/new");
+            if(user.role === "moderator"){
+                return res.redirect(303, "/moderator/claims");
+            }
+            res.redirect(303, "items/new");
         })
     });
 })
@@ -185,6 +204,103 @@ app.post("/logout", requireLogin, requireCsrfToken, function signOut(req, res, n
         res.redirect(303, "/");
     })
 })
+
+//route for claim an item
+app.get("/items/:id/claim", requireLogin, function showClaimPage(req, res) {
+    const item = db.prepare(`
+        SELECT name, location
+        FROM items
+        WHERE id = ?
+    `).get(req.params.id);
+
+    if (!item) {
+        return res.status(404).send("Item not found.");
+    }
+
+    return sendFormPage(req, res, "claim-item.html", item.name + " — " + item.location);
+});
+
+app.post("/items/:id/claim", requireLogin, requireCsrfToken, function submitClaim(req, res) {
+    const detail = req.body.detail;
+
+    if (typeof detail !== "string" || detail.trim().length === 0) {
+        return res.status(400).send("Enter a detail that identifies the item.");
+    }
+
+    if (detail.trim().length > 300) {
+        return res.status(400).send("Keep the identifying detail within 300 characters.");
+    }
+
+    const item = db.prepare("SELECT id FROM items WHERE id = ?").get(req.params.id);
+
+    if (!item) {
+        return res.status(404).send("Item not found.");
+    }
+
+    // The claims table allows one claim per student for each item.
+    const result = db.prepare(`
+        INSERT INTO claims (item_id, user_id, identifying_detail)
+        VALUES (?, ?, ?)
+        ON CONFLICT(item_id, user_id) DO NOTHING
+    `).run(item.id, req.session.userId, detail.trim());
+
+    if (result.changes === 0) {
+        return res.status(409).send("You already submitted a claim for this item.");
+    }
+
+    res.status(201).send("Claim submitted. It is pending moderator review.");
+});
+
+app.get("/api/moderator/claims", requireLogin, requireModerator, function listPendingClaims(req, res){
+    const claims = db.prepare(`
+        SELECT claims.id, items.name AS item_name, claims.identifying_detail
+        FROM claims
+        JOIN items ON items.id = claims.item_id
+        WHERE claims.status = 'pending'
+        ORDER BY claims.id
+    `).all();
+
+    //the response contains private ownership details
+    res.setHeader("Cache-Control", "no-store");
+    res.json(claims);
+})
+
+app.post("/moderator/claims/:id/review", requireLogin, requireModerator, requireCsrfToken, function reviewClaim(req, res){
+    const decision = req.body.decision;
+
+    if(decision !== "approved" && decision !== "rejected"){
+        return res.status(400).send("Choose Approve or Reject.")
+    }
+
+    //The NOT EXISTS works like:
+    //if two students claim the same headphones. 
+    //Once the moderator approves the first claim,
+    //SQLite sees that the headphones already have an approved claim. 
+    //The moderator can still reject the second claim.
+    const result = db.prepare(`
+        UPDATE claims
+        SET status = ?
+        WHERE id = ?
+            AND status = 'pending'
+            AND (? = 'rejected' OR NOT EXISTS (
+                SELECT 1 FROM claims AS other
+                WHERE other.item_id = claims.item_id
+                AND other.status = 'approved'
+            ))
+    `).run(decision, req.params.id, decision);
+
+    if(result.changes === 0){
+        return res.status(409).send("This decision could not be saved. Repoen the queue to check the claim.")
+    }
+
+    res.redirect(303, "/moderator/claims");
+});
+
+app.get("/moderator/claims", requireLogin, requireModerator, function showReviewPage(req, res) {
+    return sendFormPage(req, res, "review-claims.html");
+});
+
+app.use(handleError);
 
 async function startServer() {
     // Create one fallback hash using the same settings as the demo account.

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Claim a found item</title>
+</head>
+<body>
+    <main>
+        <a href="/">Back to found items</a>
+        <h1>Claim a found item</h1>
+        <p>{{ITEM_SUMMARY}}</p>
+
+        <form method="post">
+            <input type="hidden" name="csrfToken" value="{{CSRF_TOKEN}}">
+
+            <label for="detail">How can you identify this item?</label>
+            <p>Give one detail a moderator could use to check your claim.</p>
+            <textarea id="detail" name="detail" maxlength="300" required></textarea>
+
+            <button type="submit">Submit claim</button>
+        </form>
+    </main>
+</body>
+</html>
