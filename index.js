@@ -12,14 +12,27 @@ const app = express();
 const port = 3000;
 let dummyPasswordHash;
 
-app.use(function setSecurityHeaders(req, res, next){
-    //tells browser to respect the content type express sends.
+app.disable("x-powered-by");
+
+app.use(function setSecurityHeaders(req, res, next) {
     res.setHeader("X-Content-Type-Options", "nosniff");
-    //Prevents another page from embedding the app in a frame.
-    //This helps protects buttons such as Report item against clickjacking
-    res.setHeader("Content-Security-Policy", "frame-Ancestors 'none'");
+    res.setHeader("X-Frame-Options", "DENY");
+
+    const policy = [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "frame-ancestors 'none'"
+    ];
+
+    res.setHeader("Content-Security-Policy", policy.join("; "));
     next();
-})
+});
+
+app.use("/js", express.static(path.join(__dirname, "public", "js")));
 
 app.use(express.urlencoded({extended: false}));
 
