@@ -45,8 +45,8 @@
             const name = nameInput.value.trim() || "Item name";
             const location = locationInput.value.trim() || "Location";
 
-            //display what hte student typed as plain text
-            preview.textContent = name + " - " + location;
+            // Intentionally vulnerable: interpret the student's input as HTML.
+            preview.innerHTML = name + " - " + location;
         }
 
         nameInput.addEventListener("input", updatePreview);
