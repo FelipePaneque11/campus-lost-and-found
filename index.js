@@ -6,6 +6,7 @@ const argon2 = require("argon2");
 const { randomBytes } = require("node:crypto");
 const { readFile } = require("node:fs/promises");
 const handleError = require("./error-handler");
+const { logSecurityEvent, recordFailedLogin } = require("./security-log");
 
 const app = express();
 const port = 3000;
@@ -44,6 +45,7 @@ function requireLogin(req,res,next){
 
 function requireModerator(req, res, next){
     if(req.session.role !== "moderator"){
+        logSecurityEvent("moderator_access_denied");
         return res.status(403).send("Only moderator can review ownership claims.")
     }
     next();
@@ -168,6 +170,7 @@ app.post("/login", requireCsrfToken, async function signIn(req, res, next) {
     const passwordMatches = await argon2.verify(hashToCheck, password);
 
     if(!user || !passwordMatches){
+        recordFailedLogin();
         return res.status(401).send("Incorrect username or password.");
     }
 
@@ -185,6 +188,7 @@ app.post("/login", requireCsrfToken, async function signIn(req, res, next) {
             if(error){
                 return next(error)
             }
+            logSecurityEvent("login_succeeded");
             if(user.role === "moderator"){
                 return res.redirect(303, "/moderator/claims");
             }

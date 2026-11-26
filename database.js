@@ -33,4 +33,12 @@ db.exec(`
     )
 `);
 
+db.exec(`
+    CREATE TABLE IF NOT EXISTS security_events (
+        id INTEGER PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+`);
+
 module.exports = db;
