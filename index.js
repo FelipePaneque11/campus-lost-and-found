@@ -89,25 +89,23 @@ app.get("/", function showHomePage(req,res){
     res.sendFile(page);
 });
 
-app.get("/api/items", function getItems(req,res){
+app.get("/api/items", function getItems(req, res) {
     const search = req.query.search || "";
 
-    if(typeof search !== "string"){
-        return res.status(400).json({error: "Search must be text." });
+    if (typeof search !== "string") {
+        return res.status(400).json({ error: "Search must be text." });
     }
 
-    //we retrieve ID because 2 peple might report the same item name, like airpods or student card, etc...
-    const query = db.prepare(`
-        SELECT id, name, location
-        FROM items
-        WHERE instr(lower(name), lower(?)) > 0
-           OR instr(lower(location), lower(?)) > 0
-        ORDER BY id DESC
-    `);
+    const term = search.trim();
 
-    //the first value is for name and the second is for location
-    const items = query.all(search.trim(), search.trim());
-    //send what we retrieved on query.all and return to the browser
+    // Intentionally vulnerable: user input becomes part of the SQL.
+    const sql =
+        "SELECT id, name, location FROM items " +
+        "WHERE instr(lower(name), lower('" + term + "')) > 0 " +
+        "OR instr(lower(location), lower('" + term + "')) > 0 " +
+        "ORDER BY id DESC";
+
+    const items = db.prepare(sql).all();
     res.json(items);
 });
 
