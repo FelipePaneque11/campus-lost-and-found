@@ -1,64 +1,55 @@
 # Campus Lost and Found
 
-A local web application for my Secure Application Programming assignment. Students can report found items and submit ownership claims. Moderators can review the identifying details and approve or reject claims.
+This project was developed for my Secure Application Programming assignment. It compares secure and intentionally vulnerable implementations of a small lost and found application.
 
-## Run the application
+Students can browse found items, report an item, and submit a private ownership claim. Moderators can review claims and approve or reject them.
 
-I developed the project on Windows using PowerShell and Node.js 24.11.0. SQLite is included in this version of Node.js.
+## Branches
 
-Clone the repository and choose the version you want to run:
+| Branch | Purpose |
+|---|---|
+| `main` | Original development baseline and project overview. |
+| `secure` | Application with input handling, access controls, CSRF protection, session management, encrypted claim storage, security headers, and logging. |
+| `insecure` | Application containing deliberate vulnerabilities for the assignment comparison. |
+
+## Running the project
+
+Use Node.js 24 and Windows PowerShell. Clone the repository:
 
 ```powershell
 git clone https://github.com/FelipePaneque11/campus-lost-and-found.git
 cd campus-lost-and-found
+```
+
+Choose a version:
+
+```powershell
 git switch secure
+```
+
+or:
+
+```powershell
+git switch insecure
+```
+
+Follow the README on the selected branch for dependency installation, database setup, demo account creation, startup, and testing.
+
+- [Secure configuration manual](https://github.com/FelipePaneque11/campus-lost-and-found/blob/secure/README.md)
+- [Insecure configuration manual](https://github.com/FelipePaneque11/campus-lost-and-found/blob/insecure/README.md)
+
+Each version uses a separate database. The secure version also requires a persistent encryption key. Demo passwords are generated locally by `seed-user.js` when each account is first created.
+
+Stop the running Node server before switching branches. Both versions use http://127.0.0.1:3000/.
+
+## Main development baseline
+
+To run the earlier application stored on `main`:
+
+```powershell
 npm.cmd ci
-```
-
-For the insecure version, use `git switch insecure` before installing the dependencies.
-
-### Set up the encryption key on the secure branch
-
-The secure version encrypts private claim details before saving them. Run this in the PowerShell terminal where you will start the server. It reuses your saved key or generates one on first use.
-
-```powershell
-$key = [Environment]::GetEnvironmentVariable("CAMPUS_CLAIM_KEY", "User")
-if (-not $key) {
-    $key = node -p "require('node:crypto').randomBytes(32).toString('hex')"
-    [Environment]::SetEnvironmentVariable("CAMPUS_CLAIM_KEY", $key, "User")
-}
-$env:CAMPUS_CLAIM_KEY = $key
-```
-
-Keep the same key to read existing encrypted claims. Skip this step on the insecure branch.
-
-### Create the sample data and start the server
-
-```powershell
 node seed.js
-node seed-user.js
 node index.js
 ```
 
-Open http://127.0.0.1:3000. The first seed script adds two found items. The second creates `demo-student` and `demo-moderator` and prints a password for each newly created account. Save those passwords for your local demo. Running the script again keeps existing accounts and passwords.
-
-The branches use separate databases. The secure version saves `campus-lost-and-found-secure.sqlite` in your Windows user folder. The insecure version saves `campus.sqlite` in the project folder. Seed each version the first time you run it.
-
-### Try the main workflow
-
-1. Browse the home page and search for `bottle`.
-2. Sign in as `demo-student`. Open the home page, choose **Claim this item**, and submit a fictional identifying detail.
-3. In a private browser window, sign in as `demo-moderator`. Open the review queue and approve or reject the claim.
-
-### Run the browser tests
-
-Leave the server running. Open a second PowerShell terminal in the project folder and enter the student password for the branch being tested:
-
-```powershell
-$credential = Get-Credential -UserName "demo-student" -Message "Enter the local demo student password"
-$env:CAMPUS_TEST_PASSWORD = $credential.GetNetworkCredential().Password
-npx.cmd playwright install chromium
-npx.cmd playwright test
-```
-
-Press Ctrl+C in the server terminal to stop the application.
+Open http://127.0.0.1:3000/. The complete student and moderator workflows are available on the `secure` and `insecure` branches.
